@@ -17,8 +17,13 @@
     }
 
     #info { display: none; }
-    #meet { width: 100%; height: 100%; }
 
+    #meet {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* popup centered */
     #share-popup {
       position: fixed;
       top: 10px;
@@ -34,6 +39,7 @@
       display: none;
     }
 
+    /* header: logo + title */
     #share-header {
       display: flex;
       align-items: center;
@@ -62,13 +68,12 @@
       padding: 0;
     }
 
-    #share-main-row, #share-more {
-      display: none; /* guest ke case me bilkul hidden */
+    #share-main-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
     }
-
-    /* host ke liye visible hone ke liye class toggle karunga */
-    .host-show { display: flex !important; }
-    .host-block { display: block !important; }
 
     #share-link-input {
       width: 240px;
@@ -94,7 +99,18 @@
       color: #fff;
       white-space: nowrap;
     }
-    .popup-btn:active { transform: scale(0.97); }
+
+    .popup-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Expanded block niche wala */
+    #share-more {
+      display: none;            /* default band */
+      margin-top: 6px;
+      border-top: 1px solid #333;
+      padding-top: 6px;
+    }
 
     #share-more-inner {
       display: flex;
@@ -125,30 +141,46 @@
 
   <!-- popup -->
   <div id="share-popup">
-
+    <!-- header with logo + title -->
     <div id="share-header">
       <div id="share-logo">
-        <img src="img/dtdclogo.png" alt="DTDC" style="width:100%;height:100%;object-fit:cover;">
+        <img src="img/dtdclogo.png" alt="DTDC" style="width:100%;height:100%;border-radius:4px;object-fit:cover;">
       </div>
       <div id="share-popup-title">Share this link:</div>
     </div>
 
-    <!-- host-only rows -->
+    <!-- main row: input + Copy + New Meet + down arrow -->
     <div id="share-main-row">
       <input id="share-link-input" type="text" readonly />
+
+      <!-- Copy button -->
       <button id="copy-btn" class="popup-btn">Copy</button>
+
+      <!-- New Meet button -->
       <button id="newmeet-btn" class="popup-btn">New Meet</button>
+
+      <!-- Down arrow button -->
       <button id="expand-btn" class="popup-btn">▼</button>
     </div>
 
+    <!-- expanded block niche -->
     <div id="share-more">
       <div id="share-more-inner">
-        <input id="phone-input" type="tel" placeholder="Mobile number" maxlength="15" />
+        <!-- Mobile number input -->
+        <input
+          id="phone-input"
+          type="tel"
+          placeholder="Mobile number"
+          maxlength="15"
+        />
+
+        <!-- Send SMS button -->
         <button id="send-sms-btn" class="popup-btn">Send</button>
+
+        <!-- Up arrow button to collapse -->
         <button id="collapse-btn" class="popup-btn">▲</button>
       </div>
     </div>
-
   </div>
 
   <script src="https://meet.jit.si/external_api.js"></script>
@@ -159,23 +191,27 @@
 
       let role = params.get("role") || "host";
       const isHost = role !== "guest";
+
       let room = params.get("room");
 
       const sharePopup = document.getElementById("share-popup");
-      const shareMain = document.getElementById("share-main-row");
+      const shareMainRow = document.getElementById("share-main-row");
       const shareMore = document.getElementById("share-more");
-      const titleEl = document.getElementById("share-popup-title");
       const shareLinkInput = document.getElementById("share-link-input");
       const copyBtn = document.getElementById("copy-btn");
       const newMeetBtn = document.getElementById("newmeet-btn");
       const expandBtn = document.getElementById("expand-btn");
       const collapseBtn = document.getElementById("collapse-btn");
-      const sendSmsBtn = document.getElementById("send-sms-btn");
       const phoneInput = document.getElementById("phone-input");
+      const sendSmsBtn = document.getElementById("send-sms-btn");
+      const titleEl = document.getElementById("share-popup-title");
 
+      // Host ke liye random room agar nahi diya
       if (!room && isHost) {
         room = "room-" + Math.random().toString(36).substring(2, 10);
       }
+
+      // Guest ke liye room zaroori
       if (!room && !isHost) return;
 
       const guestLink =
@@ -184,75 +220,125 @@
         "?room=" + encodeURIComponent(room) +
         "&role=guest";
 
-      // popup both sides visible
-      sharePopup.style.display = "block";
-
+      // POPUP: host + guest dono ke liye
       if (isHost) {
+        // host title + link
         titleEl.textContent = "Share this link:";
         shareLinkInput.value = guestLink;
-        shareMain.classList.add("host-show");
-        shareMore.classList.add("host-block");
+        // host view: main row visible, expanded hidden by default
+        shareMainRow.style.display = "flex";
+        shareMore.style.display = "none";
       } else {
+        // guest title only
         titleEl.textContent = "DTDC X Findit";
-
-        // ❗Guest side: NO link, NO buttons
-        shareMain.style.display = "none";
+        // guest view: sirf logo + text, niche sab hide
+        shareMainRow.style.display = "none";
         shareMore.style.display = "none";
       }
+      sharePopup.style.display = "block";
 
-      // host-only behaviors
+      // ===== HOST-ONLY CONTROLS =====
       if (isHost) {
-
+        // Copy button
         copyBtn.addEventListener("click", () => {
           const text = shareLinkInput.value;
-          navigator.clipboard?.writeText(text);
-          copyBtn.innerText = "Copied!";
-          setTimeout(()=>copyBtn.innerText="Copy",1200)
+          if (!text) return;
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              const old = copyBtn.innerText;
+              copyBtn.innerText = "Copied!";
+              setTimeout(() => (copyBtn.innerText = old), 1200);
+            }).catch(fallbackCopy);
+          } else {
+            fallbackCopy();
+          }
+
+          function fallbackCopy() {
+            shareLinkInput.select();
+            shareLinkInput.setSelectionRange(0, 99999);
+            document.execCommand("copy");
+            const old = copyBtn.innerText;
+            copyBtn.innerText = "Copied!";
+            setTimeout(() => (copyBtn.innerText = old), 1200);
+          }
         });
 
-        newMeetBtn.addEventListener("click",()=>{
+        // NEW MEET BUTTON CLICK
+        newMeetBtn.addEventListener("click", () => {
           window.location.href =
             window.location.origin +
             window.location.pathname +
             "?room=new-" +
-            Math.random().toString(36).substring(2,10) +
+            Math.random().toString(36).substring(2, 10) +
             "&role=host";
         });
 
+        // ▼ Expand button -> niche block show
         expandBtn.addEventListener("click", () => {
           shareMore.style.display = "block";
         });
 
+        // ▲ Collapse button -> niche block hide
         collapseBtn.addEventListener("click", () => {
           shareMore.style.display = "none";
         });
 
+        // 📲 Send SMS button logic
         sendSmsBtn.addEventListener("click", async () => {
           const phone = phoneInput.value.trim();
           const link = shareLinkInput.value.trim();
-          if (!phone || !link) return;
 
-          const old = sendSmsBtn.innerText;
+          if (!phone) {
+            alert("Please enter mobile number.");
+            return;
+          }
+          if (!link) {
+            alert("Invite link not ready.");
+            return;
+          }
+
+          const message = `Join my meeting: ${link}`;
+
+          const oldText = sendSmsBtn.innerText;
           sendSmsBtn.innerText = "Sending...";
           sendSmsBtn.disabled = true;
 
-          try{
-            await fetch("/send-sms",{
-              method:"POST",
-              headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({phone,message:`Join my meeting: ${link}`})
+          try {
+            const res = await fetch("/send-sms", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                phone: phone,
+                message: message
+              })
             });
-            sendSmsBtn.innerText="Sent!";
-            setTimeout(()=>{sendSmsBtn.innerText=old;sendSmsBtn.disabled=false},1200)
-          }catch(e){
-            sendSmsBtn.innerText=old;
-            sendSmsBtn.disabled=false;
+
+            if (res.ok) {
+              sendSmsBtn.innerText = "Sent!";
+              setTimeout(() => {
+                sendSmsBtn.innerText = oldText;
+                sendSmsBtn.disabled = false;
+              }, 1500);
+            } else {
+              sendSmsBtn.innerText = oldText;
+              sendSmsBtn.disabled = false;
+              alert("SMS send failed (server error).");
+            }
+          } catch (err) {
+            console.error(err);
+            sendSmsBtn.innerText = oldText;
+            sendSmsBtn.disabled = false;
+            alert("SMS send failed (network error).");
           }
         });
       }
 
-      /* JITSI Setup */
-      const api = new JitsiMeetExternalAPI("meet.jit.si", {
+      const domain = "meet.jit.si";
+
+      const options = {
         roomName: room,
         parentNode: document.getElementById("meet"),
         userInfo: {
@@ -262,32 +348,68 @@
           prejoinPageEnabled: false,
           disableDeepLinking: true,
           mobileAppPromo: false,
+          startWithAudioMuted: false,
           startWithVideoMuted: !isHost,
-          constraints: isHost ? { video: { facingMode:"environment" } } : {},
-          buttonsWithNotifyClick:[{key:'hangup',preventExecution:false}]
+
+          constraints: isHost
+            ? { video: { facingMode: "environment" } }
+            : {},
+
+          deeplinking: {
+            disabled: true,
+            skipNativePrompt: true,
+          },
+
+          // Hangup click ko API pe expose karein
+          buttonsWithNotifyClick: [
+            {
+              key: 'hangup',
+              preventExecution: false
+            }
+          ]
         },
-        interfaceConfigOverwrite:{
-          PREJOIN_PAGE_ENABLED:false,
-          MOBILE_APP_PROMO:false,
-          SHOW_JITSI_WATERMARK:false,
-          SHOW_BRAND_WATERMARK:false,
-          SHOW_POWERED_BY:false,
+        interfaceConfigOverwrite: {
+          PREJOIN_PAGE_ENABLED: false,
+          MOBILE_APP_PROMO: false,
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_BRAND_WATERMARK: false,
+          SHOW_POWERED_BY: false,
         }
-      });
+      };
 
-      let shouldRedirect = false;
-      api.addListener("toolbarButtonClicked", (e)=>{
-        if(e.key==="hangup") shouldRedirect=true;
-      });
+      try {
+        const api = new JitsiMeetExternalAPI(domain, options);
 
-      function exit(){
-        if(!shouldRedirect) return;
-        window.location.href = isHost ? "https://abc.com" : "https://xyz.com";
+        // ✅ Sirf hangup dabane ke baad wale close pe hi redirect karna
+        let shouldRedirectOnClose = false;
+
+        api.addListener("toolbarButtonClicked", (event) => {
+          if (event.key === "hangup") {
+            shouldRedirectOnClose = true;
+          }
+        });
+
+        function handleCallEnd() {
+          if (!shouldRedirectOnClose) {
+            // e.g. login flow / internal close / error → redirect mat karo
+            return;
+          }
+
+          if (isHost) {
+            // Host -> abc.com
+            window.location.href = "https://abc.com";
+          } else {
+            // Guest -> xyz.com
+            window.location.href = "https://xyz.com";
+          }
+        }
+
+        api.addListener("readyToClose", handleCallEnd);
+        api.addListener("videoConferenceLeft", handleCallEnd);
+
+      } catch (e) {
+        console.error(e);
       }
-
-      api.addListener("readyToClose", exit);
-      api.addListener("videoConferenceLeft", exit);
-
     })();
   </script>
 </body>
